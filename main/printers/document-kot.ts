@@ -50,6 +50,10 @@ export function buildKotPrintData(order: any, items: any[], stationName: string)
       orderNumber: String(order?.order_number ?? ''),
       createdAt: String(order?.created_at ?? ''),
       tableName: String(order?.table?.name ?? ''),
+      orderType: String(order?.type ?? ''),
+      // Callers only attach `order.customer` for delivery orders (see
+      // POST /printers/print-kot) — dine-in/takeaway tickets never carry it.
+      customerPhone: String(order?.customer?.phone ?? ''),
     },
     items: ticketItems.map((item: any) => ({
       productName: String(item?.product_name ?? ''),
@@ -125,8 +129,14 @@ function kotHeaderLines(header: KotHeaderBlock, options: KotDocumentRenderOption
   // NOTE (#440/#441): keep this unaudited technical prefix verbatim; label
   // adoption remains outside this renderer change.
   lines.push(truncateShapedLine('Order: ' + header.orderNumber.text, cols, options.arabicShaping));
+  if (header.orderType) {
+    lines.push(truncateShapedLine(labelOf(header.orderType.label) + ': ' + labelOf(header.orderType.value), cols, options.arabicShaping));
+  }
   if (header.table) {
     lines.push(truncateShapedLine(formatTableLabel(header.table.label, header.table.name.text), cols, options.arabicShaping));
+  }
+  if (header.customerPhone) {
+    lines.push(truncateShapedLine(labelOf(header.customerPhone.label) + ': ' + header.customerPhone.value.text, cols, options.arabicShaping));
   }
   lines.push(labelOf(header.timeLabel) + ': ' + parseDbTimestamp(header.timestamp.text).toLocaleTimeString((options.locale ?? 'en-US') + '-u-nu-latn', tzOptions));
   return lines;

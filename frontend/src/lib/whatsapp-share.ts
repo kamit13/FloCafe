@@ -153,26 +153,23 @@ function formatItemsList(order: Bill['order'], currencyCode: string, locale: str
 }
 
 /**
- * Send a paid bill receipt through Flo's connected WhatsApp session.
- * Single source of truth for the /whatsapp/send call + error-toast mapping,
- * shared by the orders list and the PaymentModal "send after payment" step.
+ * Post one message through Flo's connected WhatsApp session and map any
+ * failure to the shared `whatsapp.send.*` toast keys. Single source of truth
+ * for the /whatsapp/send call, used by every feature that sends via the
+ * backend session (bill receipts, customer offer templates, ...).
  */
-export async function sendBillViaFlo(
-  bill: Bill,
-  customerPhone: string,
-  tenant: Pick<Tenant, 'business_name' | 'currency' | 'country'>,
+async function sendViaFlo(
+  payload: { bill_id?: number; phone_e164: string; body: string; image_data_uri?: string },
   t: (key: string, params?: Record<string, string | number>) => string,
-  opts: WhatsAppShareOptions = {},
-  localeOverride?: string,
-): Promise<void> {
-  const message = getWhatsAppMessage(bill, tenant, opts, localeOverride);
+  successKey: string,
+): Promise<boolean> {
   try {
-    const { data } = await api.post('/whatsapp/send', {
-      bill_id: bill.id,
-      phone_e164: customerPhone,
-      body: message,
-    });
-    if (data?.ok) toast.success(t('whatsapp.send.success'));
+    const { data } = await api.post('/whatsapp/send', payload);
+    if (data?.ok) {
+      toast.success(t(successKey));
+      return true;
+    }
+    return false;
   } catch (err: unknown) {
     const axiosErr = err as { response?: { data?: { error?: string; reason?: string } } };
     const reason = axiosErr?.response?.data?.reason;
@@ -185,8 +182,55 @@ export async function sendBillViaFlo(
       toast.error(t('whatsapp.send.error.blocked'));
     } else if (reason === 'rate_limited') {
       toast.error(msg || t('whatsapp.send.error.rateLimited'));
+    } else if (reason === 'invalid_image') {
+      toast.error(t('whatsapp.send.error.invalidImage'));
     } else {
       toast.error(msg);
     }
+    return false;
   }
+}
+
+/**
+ * Send a paid bill receipt through Flo's connected WhatsApp session.
+ */
+export async function sendBillViaFlo(
+  bill: Bill,
+  customerPhone: string,
+  tenant: Pick<Tenant, 'business_name' | 'currency' | 'country'>,
+  t: (key: string, params?: Record<string, string | number>) => string,
+  opts: WhatsAppShareOptions = {},
+  localeOverride?: string,
+): Promise<void> {
+  const message = getWhatsAppMessage(bill, tenant, opts, localeOverride);
+  await sendViaFlo({ bill_id: bill.id, phone_e164: customerPhone, body: message }, t, 'whatsapp.send.success');
+}
+
+/**
+ * Send an arbitrary text message (e.g. a customer offer template) through
+ * Flo's connected WhatsApp session. Returns whether the send succeeded so
+ * callers can react (e.g. skip to the next customer in a list).
+ */
+export async function sendTextViaFlo(
+  customerPhone: string,
+  body: string,
+  t: (key: string, params?: Record<string, string | number>) => string,
+  successKey: string = 'whatsapp.send.success',
+  imageDataUri?: string | null,
+): Promise<boolean> {
+  return sendViaFlo(
+    { phone_e164: customerPhone, body, ...(imageDataUri ? { image_data_uri: imageDataUri } : {}) },
+    t,
+    successKey,
+  );
+}
+
+/**
+ * Build a `wa.me` deep link pre-filled with arbitrary text, for use when
+ * Flo's WhatsApp session isn't connected. No backend session required.
+ */
+export function buildWaMeLink(phone: string, text: string): string {
+  const cleanPhone = phone.replace(/\D/g, '');
+  const encoded = encodeURIComponent(text);
+  return cleanPhone ? `https://wa.me/${cleanPhone}?text=${encoded}` : `https://wa.me/?text=${encoded}`;
 }

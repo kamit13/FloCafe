@@ -6,7 +6,7 @@
  */
 
 import ReceiptPrinterEncoder from '@point-of-sale/receipt-printer-encoder';
-import type { Order } from '@/lib/types';
+import type { Order, OrderItem } from '@/lib/types';
 import { formatTime } from './format-date';
 import { safePrinterText, type PrintWarning } from './warnings';
 
@@ -21,6 +21,12 @@ export interface KotOptions {
    * Default: false.
    */
   arabicShaping?: boolean;
+  /**
+   * Print only these items instead of every item on `order` — e.g. when
+   * items were just added to an already-running order and the ticket
+   * should show what's new, not a reprint of the whole order.
+   */
+  items?: OrderItem[];
 }
 
 // Must match main/printers/profiles.ts generic-escpos-58/80 fontAColumns.
@@ -61,12 +67,17 @@ export function buildKotBytes(
     safePrinterText(enc, `Customer: ${order.customer.name}`, warnings, false, arabicShaping, undefined, cols).newline();
   }
 
+  // Delivery contact number — dine-in/takeaway tickets don't need it.
+  if (order.type === 'delivery' && order.customer?.phone) {
+    safePrinterText(enc, `Phone: ${order.customer.phone}`, warnings, false, arabicShaping, undefined, cols).newline();
+  }
+
   enc.bold(false);
   enc.text(formatTime(order.created_at)).newline();
   enc.rule({ style: 'double' });
 
   // ── Items ────────────────────────────────────────────────────────────────────
-  const items = order.items ?? [];
+  const items = opts.items ?? order.items ?? [];
   let hasItems = false;
 
   for (const item of items) {

@@ -9,6 +9,7 @@ import * as dns from 'dns';
 import * as https from 'https';
 import * as net from 'net';
 import { asyncHandler } from '../middleware/async-handler';
+import { validateImageUrl } from '../lib/data-uri-image';
 
 const MAX_FETCH_BYTES = 10 * 1024 * 1024;
 
@@ -152,35 +153,6 @@ function fetchPinnedHttps(
     request.on('error', (error) => finish(error));
     request.end();
   });
-}
-
-/**
- * Validate that an image_url value is a valid Base64 data URI or null.
- * Enforces: type check, data:image/ prefix, supported formats (webp/png/jpeg),
- * and max length of 50,000 characters (~36.6 KB decoded).
- *
- * Called at write time — the GET /:id/image endpoint trusts this validation
- * and does NOT re-encode to verify (re-encode rejects valid images with
- * minor encoding variations like trailing newlines).
- */
-function validateImageUrl(imageUrl: any): { valid: boolean; error?: string } {
-  if (imageUrl === null || imageUrl === undefined) {
-    return { valid: true }; // null means "clear the image"
-  }
-  if (typeof imageUrl !== 'string') {
-    return { valid: false, error: 'image_url must be a string or null' };
-  }
-  if (!imageUrl.startsWith('data:image/')) {
-    return { valid: false, error: 'image_url must be a Base64 data URI' };
-  }
-  const formatMatch = imageUrl.match(/^data:image\/(webp|png|jpeg|jpg);base64,/);
-  if (!formatMatch) {
-    return { valid: false, error: 'Invalid image format. Supported: webp, png, jpeg' };
-  }
-  if (imageUrl.length > 50_000) {
-    return { valid: false, error: 'Image too large (max 50,000 characters)' };
-  }
-  return { valid: true };
 }
 
 /**

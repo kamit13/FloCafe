@@ -9,7 +9,7 @@ import { usePosSettingsStore } from '@/store/pos-settings';
 import { useSidebar } from '@/components/ui/sidebar';
 import toast from 'react-hot-toast';
 import { ShoppingCart, X } from 'lucide-react';
-import type { Addon, Category, Product, Table, Bill, Order, CartItem } from '@/lib/types';
+import type { Addon, Category, Product, Table, Bill, Order, OrderItem, CartItem } from '@/lib/types';
 import { useConfirm } from '@/hooks/use-confirm';
 import {
   Drawer, DrawerContent, DrawerTrigger,
@@ -253,7 +253,7 @@ export default function POSPage() {
   const billingIsPrepaid = billingType === 'prepaid';
   const shouldTakePaymentNow = billingIsPrepaid;
 
-  const printKotIfEnabled = async (order: Order) => {
+  const printKotIfEnabled = async (order: Order, itemsOnly?: OrderItem[]) => {
     // kot_printing_enabled is coarser than auto_print_kot: when it's off, no
     // KOT print command should go out at all, regardless of the auto-print
     // preference (issue #133).
@@ -261,7 +261,9 @@ export default function POSPage() {
     if (!autoPrintKot) return;
 
     try {
-      const printWarnings = await printKot(order);
+      // When items were just added to an already-running order, print a
+      // ticket for only what's new — not a reprint of the whole order.
+      const printWarnings = await printKot(order, itemsOnly ? { items: itemsOnly } : undefined);
       showPrintWarningsToast(printWarnings);
     } catch (err) {
       console.error('[POS] KOT print failed:', err);
@@ -448,6 +450,9 @@ export default function POSPage() {
     setSubmitting(true);
     try {
       let orderForKot: Order;
+      // Only set for the "add items to a running order" branch — the items
+      // just appended, so the KOT can print just what's new.
+      let newItemsForKot: OrderItem[] | undefined;
 
       if (pendingOrder) {
         // Add new items to an existing order with a durable retry key.
@@ -479,6 +484,7 @@ export default function POSPage() {
         );
         toast.success(t('itemsAddedToOrder', { number: pendingOrder.order_number }));
         orderForKot = data.order as Order;
+        newItemsForKot = Array.isArray(data.newItems) && data.newItems.length > 0 ? data.newItems as OrderItem[] : undefined;
         if (!clearAppendAttempt(storage, itemAttempt)) throw new Error('Unable to clear append retry state');
         addItemsAttemptRef.current = null;
         setPendingOrder(null);
@@ -527,7 +533,7 @@ export default function POSPage() {
       setMobileCartOpen(false);
       await refreshTables();
 
-      await printKotIfEnabled(orderForKot);
+      await printKotIfEnabled(orderForKot, newItemsForKot);
     } catch {
       toast.error(t('placeOrderFailed'));
     } finally {

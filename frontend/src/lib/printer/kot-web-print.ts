@@ -14,7 +14,7 @@
  * geometry; all content styles are inline for the same reason.
  */
 
-import type { Order } from '@/lib/types';
+import type { Order, OrderItem } from '@/lib/types';
 import { createTranslator } from 'use-intl/core';
 import { getCachedMessages } from '@/lib/i18n/loader';
 import { LANGUAGES, getLanguageDirection, type Language } from '@/lib/i18n/languages';
@@ -31,6 +31,12 @@ export interface KotWebPrintOptions {
   paperWidth?: 58 | 80;
   /** UI/receipt language (defaults to the client KOT language policy). */
   language?: Language;
+  /**
+   * Print only these items instead of every item on `order` — e.g. when
+   * items were just added to an already-running order and the ticket
+   * should show what's new, not a reprint of the whole order.
+   */
+  items?: OrderItem[];
 }
 
 /** Resolve the KOT ticket language: fixed policy language or the UI language. */
@@ -96,7 +102,7 @@ export function generateKotHtml(
 
   const orderType = String(order.type ?? '').replace('_', ' ').toUpperCase();
 
-  const items = (order.items ?? [])
+  const items = (opts.items ?? order.items ?? [])
     .filter((item) => item.status !== 'served' && item.status !== 'ready')
     .map((item) => ({
       name: directionalText(String(item.product_name ?? ''), base),
@@ -128,6 +134,7 @@ export function generateKotHtml(
       ${order.table?.name ? `<p style="margin:2px 0;">${escapeHtml(labelWithoutPlaceholder(tr('pos.tableLabel')))}: ${directionalValue(directionalText(String(order.table.name), base), base)}</p>` : ''}
       ${orderType ? `<p style="margin:2px 0;">${escapeHtml(tr('print.kot.type'))}: ${escapeHtml(orderType)}</p>` : ''}
       ${order.customer?.name ? `<p style="margin:2px 0;">${escapeHtml(tr('pos.customer'))}: ${directionalValue(directionalText(String(order.customer.name), base), base)}</p>` : ''}
+      ${order.type === 'delivery' && order.customer?.phone ? `<p style="margin:2px 0;">${escapeHtml(tr('print.numberShort'))}: ${directionalValue(directionalText(String(order.customer.phone), base), base)}</p>` : ''}
       <p style="margin:2px 0;">${escapeHtml(formatTime(createdAt, LANGUAGES[lang]?.locale))}</p>
       <hr style="border:1px dashed #000;margin:${padding} 0;">
       ${itemRows}

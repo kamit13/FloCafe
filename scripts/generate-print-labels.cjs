@@ -107,6 +107,12 @@ const BORROWED_KEYS = [
   'pos.methodCash',
   'pos.methodCard',
   'pos.methodWallet',
+  // Order-type values for the KOT header (order.type), reusing the same
+  // display strings the POS order-type picker and Orders page already show.
+  'pos.orderTypeDineIn',
+  'pos.orderTypeTakeaway',
+  'pos.orderTypeDelivery',
+  'orders.online',
 ];
 
 const ALL_CONCEPTS = [...PRINT_NAMESPACE_KEYS, ...BORROWED_KEYS];

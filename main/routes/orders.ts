@@ -431,7 +431,13 @@ router.post('/', orderWriteRateLimit, requireRole(...ROLE_ACCESS.sales), (req: R
           }
           try {
             const response = JSON.parse(prior.response_json);
-            return { order: response.order, orderItems: response.order?.items || [], idempotentReplay: true };
+            return {
+              order: response.order,
+              orderItems: response.order?.items || [],
+              table: response.order?.table ?? null,
+              customer: response.order?.customer ?? null,
+              idempotentReplay: true,
+            };
           } catch {
             throw Object.assign(new Error('Stored order response is invalid'), { statusCode: 500 });
           }
@@ -588,12 +594,17 @@ router.post('/', orderWriteRateLimit, requireRole(...ROLE_ACCESS.sales), (req: R
 
       const order = parseRowJson(db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId)) as any;
       const orderItems = attachEffectiveAddons(db, db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(orderId).map(parseItemJson) as any[]);
-      const response = { order: Object.assign({}, order, { items: orderItems }) };
+      // Hydrate table/customer onto the response — KOT auto-print (browser/WebUSB
+      // paths) reads order.table.name / order.customer.phone straight off this
+      // object rather than re-fetching, so a bare order row silently prints
+      // without a table number or delivery phone.
+      const { table: hydratedTable, customer: hydratedCustomer } = batchHydrateOrders(db, [order])[0];
+      const response = { order: Object.assign({}, order, { items: orderItems, table: hydratedTable, customer: hydratedCustomer }) };
       if (idempotencyKey && requestHash) {
         db.prepare('INSERT INTO order_idempotency (user_id, idempotency_key, request_hash, response_json, created_at) VALUES (?, ?, ?, ?, ?)')
           .run(idempotencyUserId, idempotencyKey, requestHash, JSON.stringify(response), now());
       }
-      return { order, orderItems, idempotentReplay: false };
+      return { order, orderItems, table: hydratedTable, customer: hydratedCustomer, idempotentReplay: false };
     });
 
     if (!result.idempotentReplay) {
@@ -609,7 +620,7 @@ router.post('/', orderWriteRateLimit, requireRole(...ROLE_ACCESS.sales), (req: R
       }
     }
 
-    res.status(result.idempotentReplay ? 200 : 201).json({ order: Object.assign({}, result.order, { items: result.orderItems }) });
+    res.status(result.idempotentReplay ? 200 : 201).json({ order: Object.assign({}, result.order, { items: result.orderItems, table: result.table, customer: result.customer }) });
   } catch (error: any) {
     console.error('[Orders] Create error:', error);
     console.error("[API] Internal error:", error);
@@ -711,6 +722,7 @@ router.post('/:id/items', orderWriteRateLimit, requireRole(...ROLE_ACCESS.sales)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
       `);
 
+      const newItemIds = new Set<number>();
       for (const item of items) {
         const product = db.prepare('SELECT * FROM products WHERE id = ?').get(item.product_id) as any;
         if (!product) {
@@ -764,6 +776,7 @@ router.post('/:id/items', orderWriteRateLimit, requireRole(...ROLE_ACCESS.sales)
           item.special_instructions || null, itemCreatedAt, itemCreatedAt
         );
         insertOrderItemAddons(db, insertItemResult.lastInsertRowid, item.addons, itemCreatedAt);
+        newItemIds.add(Number(insertItemResult.lastInsertRowid));
 
         if (product.track_inventory) {
           db.prepare('UPDATE products SET stock_quantity = stock_quantity - ?, updated_at = ? WHERE id = ?')
@@ -854,19 +867,27 @@ router.post('/:id/items', orderWriteRateLimit, requireRole(...ROLE_ACCESS.sales)
 
       const updatedOrder = parseRowJson(db.prepare('SELECT * FROM orders WHERE id = ?').get(req.params.id)) as any;
       const updatedItems = attachEffectiveAddons(db, db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(req.params.id).map(parseItemJson) as any[]);
-      const response = { order: Object.assign({}, updatedOrder, { items: updatedItems }) };
+      // Items just inserted by this call, for callers that want to print a
+      // KOT covering only what was just added rather than the whole order.
+      const newItems = updatedItems.filter((item: any) => newItemIds.has(Number(item.id)));
+      // Hydrate table/customer onto the response — KOT auto-print (browser/WebUSB
+      // paths) reads order.table.name / order.customer.phone straight off this
+      // object rather than re-fetching, so a bare order row silently prints
+      // without a table number or delivery phone.
+      const { table: hydratedTable, customer: hydratedCustomer } = batchHydrateOrders(db, [updatedOrder])[0];
+      const response = { order: Object.assign({}, updatedOrder, { items: updatedItems, table: hydratedTable, customer: hydratedCustomer }), newItems };
       if (idempotencyKey && requestHash) {
         db.prepare('INSERT INTO order_idempotency (user_id, idempotency_key, request_hash, response_json, created_at) VALUES (?, ?, ?, ?, ?)')
           .run(idempotencyUserId, idempotencyKey, requestHash, JSON.stringify(response), now());
       }
-      return { updatedOrder, updatedItems, replayResponse: null };
+      return { updatedOrder, updatedItems, newItems, table: hydratedTable, customer: hydratedCustomer, replayResponse: null };
     });
 
     if (result.replayResponse) return res.json(result.replayResponse);
     cloudSync.recordOrderChanged(req.params.id as string, 'order.updated');
     notifyKdsUpdate();
 
-    res.json({ order: Object.assign({}, result.updatedOrder, { items: result.updatedItems }) });
+    res.json({ order: Object.assign({}, result.updatedOrder, { items: result.updatedItems, table: result.table, customer: result.customer }), newItems: result.newItems });
   } catch (error: any) {
     console.error("[API] Internal error:", error);
     res.status(error.statusCode || 500).json({ error: error.statusCode ? error.message : "Internal server error" });

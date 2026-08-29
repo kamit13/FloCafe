@@ -13,6 +13,7 @@ import { countryConfirmationPatch } from '../services/country-provenance';
 import { getHttpRequestSignal, trackHttpRequestWork } from '../shutdown';
 import { asyncHandler } from '../middleware/async-handler';
 import { normalizeOptionalPhone } from '../lib/phone';
+import { validateImageUrl } from '../lib/data-uri-image';
 import { CORE_BILL_TEMPLATES, isAvailableBillTemplate, listInstalledPrintTemplates, upgradeBillTemplateValue } from '../services/print-templates';
 import { listMerchantPrintTemplates } from '../services/merchant-print-templates';
 import {
@@ -76,6 +77,8 @@ const OPTIONAL_SETTING_DEFAULTS: Record<string, string> = {
   bill_footer_message: '',
   printer_trim_decimals: 'false',
   split_checks_enabled: 'false',
+  whatsapp_offer_template: '',
+  whatsapp_offer_image: '',
   // Print language policies (#441) — inherit store language, no second
   // language. Defaults preserve pre-policy behavior for existing tenants.
   [BILL_LANGUAGE_POLICY_KEY]: defaultLanguagePolicySettingJson(),
@@ -870,6 +873,7 @@ const ALLOWED_WILDCARD_KEYS = new Set([
   'diagnostics_consent',
   'kds_enabled', 'server_app_enabled', 'kot_printing_enabled',
   'split_checks_enabled',
+  'whatsapp_offer_template', 'whatsapp_offer_image',
   BILL_LANGUAGE_POLICY_KEY, KOT_LANGUAGE_POLICY_KEY,
   'currency_display', 'number_digits', 'calendar',
 ]);
@@ -987,6 +991,14 @@ router.put('/:key', settingsWriteRateLimit, requireRole(...ROLE_ACCESS.ownerMana
       if (typeof value !== 'string' || !isLocalePreferenceSupported(wildcardKey, value, countryCode)) {
         return res.status(400).json({ error: `Invalid ${wildcardKey} for country ${countryCode}` });
       }
+    }
+
+    if (req.params.key === 'whatsapp_offer_image') {
+      const imageCheck = validateImageUrl(value === '' ? null : value);
+      if (!imageCheck.valid) {
+        return res.status(400).json({ error: imageCheck.error || 'Invalid image' });
+      }
+      valueToPersist = value ?? '';
     }
 
     if (req.params.key === 'business_phone') {

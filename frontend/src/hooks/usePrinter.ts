@@ -296,7 +296,12 @@ export const usePrinterStore = create<PrinterState>()(
           const hw = get().hardwarePrinter;
           if (hw && get().printMethod === 'escpos') {
             try {
-              const response = await api.post<{ warnings?: PrintWarning[] }>('/printers/print-kot', { orderId: order.id, useUnicode: printerUseUnicode, arabicShaping: printerArabicShaping });
+              const response = await api.post<{ warnings?: PrintWarning[] }>('/printers/print-kot', {
+                orderId: order.id,
+                useUnicode: printerUseUnicode,
+                arabicShaping: printerArabicShaping,
+                ...(opts?.items ? { items: opts.items } : {}),
+              });
               return response.data.warnings || [];
             } catch (err: unknown) {
               const e = err as { response?: { data?: { error?: string } }; message?: string };
@@ -324,7 +329,7 @@ export const usePrinterStore = create<PrinterState>()(
           const { generateKotHtml, resolveKotTicketLanguage } = await import('@/lib/printer/kot-web-print');
           const kotLanguage = resolveKotTicketLanguage();
           const failedLanguages = await ensurePrintLanguagesLoaded([kotLanguage]);
-          const html = generateKotHtml(order, { paperWidth });
+          const html = generateKotHtml(order, { paperWidth, ...(opts?.items ? { items: opts.items } : {}) });
           await printerService.printViaBrowser(html, paperWidth);
           // A failed locale load degrades to English labels; surface it
           // through the established warning path instead of staying silent

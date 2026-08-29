@@ -667,6 +667,10 @@ export interface KotOrderSnapshot {
   readonly orderNumber: string;
   readonly createdAt: string;
   readonly tableName: string;
+  /** `orders.type` — 'dine_in' | 'takeaway' | 'delivery' | 'online', or '' if unknown. */
+  readonly orderType: string;
+  /** Delivery contact number. Callers only populate this for delivery orders. */
+  readonly customerPhone: string;
 }
 
 /**
@@ -694,6 +698,10 @@ export interface KotHeaderBlock {
   readonly orderNumber: DirectionalText;
   /** Table reference with its (uninterpolated) label concept. */
   readonly table: { readonly label: SemanticLabel; readonly name: DirectionalText } | null;
+  /** Order type (Dine in / Takeaway / Delivery / Online), when known. */
+  readonly orderType: { readonly label: SemanticLabel; readonly value: SemanticLabel } | null;
+  /** Delivery contact number. Only set by callers for delivery orders. */
+  readonly customerPhone: { readonly label: SemanticLabel; readonly value: DirectionalText } | null;
   readonly timeLabel: SemanticLabel;
   /** Canonical stored timestamp; presentation formatting is a renderer duty. */
   readonly timestamp: DirectionalText;
@@ -725,6 +733,14 @@ export interface KotDocument {
   readonly blocks: readonly KotDocumentBlock[];
 }
 
+/** Maps `orders.type` values to their display-label concept. Unknown/empty → null. */
+const ORDER_TYPE_CONCEPTS: Readonly<Record<string, LabelConceptId>> = Object.freeze({
+  dine_in: 'pos.orderTypeDineIn',
+  takeaway: 'pos.orderTypeTakeaway',
+  delivery: 'pos.orderTypeDelivery',
+  online: 'orders.online',
+});
+
 /**
  * Build a KotDocument v1 from normalized kitchen-ticket data. Pure: reads
  * only its arguments and performs no IO or recomputation.
@@ -746,6 +762,18 @@ export function buildKotDocument(printData: KotPrintData, printContext: PrintCon
       ? Object.freeze({
         label: resolveSemanticLabel(labels, 'pos.tableLabel'),
         name: directionalText(printData.order.tableName, base),
+      })
+      : null,
+    orderType: ORDER_TYPE_CONCEPTS[printData.order?.orderType ?? '']
+      ? Object.freeze({
+        label: resolveSemanticLabel(labels, 'print.kot.type'),
+        value: resolveSemanticLabel(labels, ORDER_TYPE_CONCEPTS[printData.order!.orderType]),
+      })
+      : null,
+    customerPhone: typeof printData.order?.customerPhone === 'string' && printData.order.customerPhone.length > 0
+      ? Object.freeze({
+        label: resolveSemanticLabel(labels, 'print.numberShort'),
+        value: directionalText(printData.order.customerPhone, base),
       })
       : null,
     timeLabel: resolveSemanticLabel(labels, 'print.time'),

@@ -118,11 +118,11 @@ interface DiscountModal {
 
 export default function OrdersPage() {
   const { currentTenant, user } = useAuthStore();
-  const { printBill } = usePrinterStore();
+  const { printBill, printKot } = usePrinterStore();
   const heldOrdersStore = useHeldOrdersStore();
   const router = useRouter();
   const cartStore = useCartStore();
-  const { setTablesRequired, autoPrintBill, printerUseUnicode, printerArabicShaping } = usePosSettingsStore();
+  const { setTablesRequired, autoPrintBill, printerUseUnicode, printerArabicShaping, kotPrintingEnabled, autoPrintKot } = usePosSettingsStore();
   const tOrders = useTranslations('orders');
   const tCommon = useTranslations('common');
   const tNav = useTranslations('nav');
@@ -832,12 +832,28 @@ export default function OrdersPage() {
         orderNumber: addItemsOrder.order_number,
       });
       addItemsAttemptRef.current = attempt;
-      await api.post(`/orders/${addItemsOrder.id}/items`, {
+      const { data } = await api.post(`/orders/${addItemsOrder.id}/items`, {
         items,
       }, { headers: { 'Idempotency-Key': attempt.idempotencyKey } });
       if (!clearAppendAttempt(storage, attempt)) throw new Error('Unable to clear append retry state');
       addItemsAttemptRef.current = null;
       toast.success(tOrders('itemsAdded', { count: selectedItems.length }));
+
+      // Auto-print a KOT for just the items added here — not a reprint of
+      // the whole order (issue #133: kot_printing_enabled is the coarse
+      // kill switch, auto_print_kot is the per-action preference).
+      if (kotPrintingEnabled && autoPrintKot) {
+        const newItems: OrderItem[] = Array.isArray(data?.newItems) ? data.newItems : [];
+        if (newItems.length > 0) {
+          try {
+            const printWarnings = await printKot(data.order as Order, { items: newItems });
+            showPrintWarningsToast(printWarnings);
+          } catch {
+            toast.error(tOrders('kotPrintFailed'));
+          }
+        }
+      }
+
       openAddItemsModal(null);
       fetchOrders();
     } catch {

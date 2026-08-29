@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 
 
 import toast from 'react-hot-toast';
-import { Plus, Search, X, Edit, Wallet, History, TrendingUp, TrendingDown, AlertCircle } from 'lucide-react';
+import { Plus, Search, X, Edit, Wallet, History, TrendingUp, TrendingDown, AlertCircle, MessageCircle } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 
 import type { Customer } from '@/lib/types';
@@ -18,6 +18,9 @@ import { Ltr } from '@/components/layout/Ltr';
 import { useFormatCurrency } from '@/hooks/useFormatCurrency';
 import { useFormatDate } from '@/hooks/useFormatDate';
 import { useFormatNumber } from '@/hooks/useFormatNumber';
+import { useWhatsAppReady } from '@/hooks/useWhatsAppReady';
+import { sendTextViaFlo, buildWaMeLink } from '@/lib/whatsapp-share';
+import ImageUploader from '@/components/products/ImageUploader';
 
 function SortIcon({ field, sortField, sortOrder }: { field: string; sortField: string; sortOrder: 'asc' | 'desc' }) {
   if (sortField !== field) return <span className="text-gray-300 w-3 inline-block ms-1 opacity-0 group-hover:opacity-100 transition-opacity">↕</span>;
@@ -31,6 +34,7 @@ export default function CustomersPage() {
   const tPos = useTranslations('pos');
   const tNav = useTranslations('nav');
   const tCommon = useTranslations('common');
+  const tWhatsappSend = useTranslations('whatsapp.send');
   const fmt = useFormatCurrency();
   const { formatDate } = useFormatDate();
   const fmtNum = useFormatNumber();
@@ -50,6 +54,78 @@ export default function CustomersPage() {
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
 
   const [form, setForm] = useState({ name: '', phone: '', email: '', country_code: dialCode });
+
+  // sendTextViaFlo (shared with whatsapp-share.ts) takes a translator
+  // callback; bridge the typed `whatsapp.send` namespace to that contract,
+  // same pattern as PaymentModal's bill-receipt send.
+  const whatsappSendT = (key: string): string =>
+    tWhatsappSend(
+      key.replace(/^whatsapp\.send\./, '') as
+        | 'success'
+        | 'offerSuccess'
+        | 'failed'
+        | 'customerPhoneRequired'
+        | 'error.notConnected'
+        | 'error.notOnWhatsapp'
+        | 'error.blocked'
+        | 'error.rateLimited'
+        | 'error.invalidImage',
+    );
+  const isWhatsAppReady = useWhatsAppReady();
+  const [offerTemplate, setOfferTemplate] = useState('');
+  const [offerImage, setOfferImage] = useState<string | null>(null);
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [sendingOfferFor, setSendingOfferFor] = useState<string | number | null>(null);
+
+  useEffect(() => {
+    api.get('/settings/whatsapp_offer_template')
+      .then(({ data }) => setOfferTemplate(data?.setting?.value ?? ''))
+      .catch(() => { /* not set yet — keep default empty template */ });
+    api.get('/settings/whatsapp_offer_image')
+      .then(({ data }) => setOfferImage(data?.setting?.value || null))
+      .catch(() => { /* not set yet — keep no image */ });
+  }, []);
+
+  const saveOfferTemplate = async () => {
+    setSavingTemplate(true);
+    try {
+      await Promise.all([
+        api.put('/settings/whatsapp_offer_template', { value: offerTemplate }),
+        api.put('/settings/whatsapp_offer_image', { value: offerImage ?? '' }),
+      ]);
+      toast.success(tCustomers('offerTemplateSaved'));
+    } catch {
+      toast.error(tCustomers('offerTemplateSaveFailed'));
+    } finally {
+      setSavingTemplate(false);
+    }
+  };
+
+  const sendOffer = async (c: Customer) => {
+    const template = offerTemplate.trim();
+    if (!template) {
+      toast.error(tCustomers('offerTemplateRequired'));
+      return;
+    }
+    if (!c.phone) {
+      toast.error(tWhatsappSend('customerPhoneRequired'));
+      return;
+    }
+    const message = offerTemplate.split('{{name}}').join(c.name);
+    setSendingOfferFor(c.id);
+    try {
+      if (isWhatsAppReady) {
+        await sendTextViaFlo(c.phone, message, whatsappSendT, 'whatsapp.send.offerSuccess', offerImage);
+      } else {
+        // wa.me links can only pre-fill text — an offer image can't ride along
+        // without Flo's connected session, so fall back to text-only and say so.
+        if (offerImage) toast(tCustomers('offerImageDroppedForWaMe'));
+        window.open(buildWaMeLink(c.phone, message), '_blank', 'noopener,noreferrer');
+      }
+    } finally {
+      setSendingOfferFor(null);
+    }
+  };
 
   const [ledgerCustomer, setLedgerCustomer] = useState<Customer | null>(null);
   const [ledgerData, setLedgerData] = useState<{ balance: number; transactions: { id: number; type: string; amount: number; description: string; created_at: string; expires_at?: string }[] } | null>(null);
@@ -155,6 +231,30 @@ export default function CustomersPage() {
         <Button onClick={openAdd}><Plus size={16} className="me-1" /> {tCustomer('add')}</Button>
       </div>
 
+      <div className="bg-white rounded-xl border border-gray-100 p-4 mb-4">
+        <label htmlFor="whatsapp-offer-template" className="block text-sm font-medium text-gray-700 mb-1">
+          {tCustomers('offerTemplateTitle')}
+        </label>
+        <textarea
+          id="whatsapp-offer-template"
+          value={offerTemplate}
+          onChange={(e) => setOfferTemplate(e.target.value)}
+          placeholder={tCustomers('offerTemplatePlaceholder')}
+          rows={2}
+          className="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-brand text-sm resize-y"
+        />
+        <div className="mt-3">
+          <p className="block text-sm font-medium text-gray-700 mb-1">{tCustomers('offerImageLabel')}</p>
+          <ImageUploader value={offerImage} onChange={setOfferImage} />
+        </div>
+        <div className="flex items-center justify-between mt-3 gap-3">
+          <p className="text-xs text-gray-400">{tCustomers('offerTemplateHint', { placeholder: '{{name}}' })}</p>
+          <Button size="sm" variant="secondary" onClick={saveOfferTemplate} disabled={savingTemplate}>
+            {tCustomers('offerTemplateSave')}
+          </Button>
+        </div>
+      </div>
+
       <div className="relative mb-4">
         <Search size={18} className="absolute start-3 top-1/2 -translate-y-1/2 text-gray-400" />
         <input
@@ -225,9 +325,18 @@ export default function CustomersPage() {
                   )}
                 </td>
                 <td className="p-4 text-center">
-                  <Button variant="ghost" size="sm" onClick={() => openEdit(c)}>
-                    <Edit size={14} />
-                  </Button>
+                  <div className="flex items-center justify-center gap-1">
+                    <Button variant="ghost" size="sm" onClick={() => openEdit(c)}>
+                      <Edit size={14} />
+                    </Button>
+                    <Button
+                      variant="ghost" size="sm" onClick={() => sendOffer(c)}
+                      disabled={!c.phone || sendingOfferFor === c.id}
+                      title={tCustomers('sendOfferTitle')}
+                    >
+                      <MessageCircle size={14} />
+                    </Button>
+                  </div>
                 </td>
                 <td className="p-4 text-center">
                   <Button variant="ghost" size="sm" onClick={() => openLedger(c)} title={tCustomer('viewLedgerTitle')}>

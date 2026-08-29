@@ -586,21 +586,37 @@ router.post('/print-kot', requireRole(...ROLE_ACCESS.ownerManagerCashier), async
       }
     }
 
-    // An explicit stationName/items override (not used by the current frontend,
-    // but kept for any external caller) always prints a single ticket, as before.
-    // Otherwise, auto-route items to their configured kitchen stations.
+    // Delivery orders print the customer's contact number on the KOT so the
+    // kitchen/rider can reach them; dine-in and takeaway tickets don't need it.
+    if (order.type === 'delivery' && order.customer_id) {
+      const customer: any = db.prepare('SELECT phone, country_code FROM customers WHERE id = ?').get(order.customer_id);
+      if (customer?.phone) {
+        order.customer = {
+          phone: customer.country_code && !customer.phone.startsWith(customer.country_code)
+            ? `${customer.country_code} ${customer.phone}`
+            : customer.phone,
+        };
+      }
+    }
+
+    // An explicit stationName override (not used by the current frontend, but
+    // kept for any external caller) always prints a single ticket, as before.
+    // Otherwise, auto-route items to their configured kitchen stations — an
+    // explicit `items` array (e.g. only the items just added to a running
+    // order) restricts routing to that subset instead of the whole order,
+    // but still splits across stations like a normal auto-print does.
     let success = true;
     const warnings: NonNullable<Awaited<ReturnType<typeof printKOTDetailed>>['warnings']> = [];
     let failure: Awaited<ReturnType<typeof printKOTDetailed>> | null = null;
-    if (stationName || items) {
+    if (stationName) {
       const kotItems = items || orderItems;
-      const station = stationName || 'Kitchen';
-      const result = await printKOTDetailed(order, kotItems, station, useUnicode, undefined, getHttpRequestSignal(req), arabicShapingOverride, kotLanguage);
+      const result = await printKOTDetailed(order, kotItems, stationName, useUnicode, undefined, getHttpRequestSignal(req), arabicShapingOverride, kotLanguage);
       success = result.ok;
       failure = result.ok ? null : result;
       warnings.push(...(result.warnings || []));
     } else {
-      const groups = routeItemsToStations(db, orderItems).filter((g) => g.items.length > 0);
+      const itemsToRoute = items || orderItems;
+      const groups = routeItemsToStations(db, itemsToRoute).filter((g) => g.items.length > 0);
       for (const group of groups) {
         const result = await printKOTDetailed(order, group.items, group.stationName, useUnicode, group.printer || undefined, getHttpRequestSignal(req), arabicShapingOverride, kotLanguage);
         success = success && result.ok;

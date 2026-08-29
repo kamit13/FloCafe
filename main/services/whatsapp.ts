@@ -5,6 +5,7 @@ import type { WASocket as BaileysSocket, WAMessageKey } from '@whiskeysockets/ba
 import { parsePhoneNumber } from 'libphonenumber-js';
 import { getDatabase, getSettingValue, now } from '../db';
 import { SHUTDOWN_TIMEOUT_MS } from '../shutdown';
+import { parseDataUriImage } from '../lib/data-uri-image';
 
 const { loadBaileys: loadBaileysModule } = require('../baileys-loader.cjs') as {
   loadBaileys: () => Promise<typeof import('@whiskeysockets/baileys')>;
@@ -98,6 +99,8 @@ interface QueuedSend {
   kind: 'bill_receipt' | 'manual_reply' | 'auto_followup';
   userId: string | null;
   signal?: AbortSignal;
+  /** Validated `data:image/...;base64,...` URI — attaches as an image with `body` as its caption. */
+  imageDataUri?: string | null;
 }
 
 const state: {
@@ -593,6 +596,14 @@ function attachSocketHandlers(socket: BaileysSocket): void {
   socket.ev.on('connection.update', (update: any) => {
     void trackWhatsAppWork((async () => {
     if (isWhatsAppTerminal()) return;
+    // A socket superseded by a newer reconnect attempt can still emit a
+    // trailing/delayed event (e.g. a late 'close' from the old WebSocket)
+    // after `state.socket` already points at the new one. Without this
+    // guard that stale event unconditionally nulls state.socket (or flips
+    // state.state) out from under the socket that's actually live, leaving
+    // /whatsapp/status stuck reporting "connected" while every send fails
+    // with reason: 'not_connected'.
+    if (state.socket !== socket) return;
     const { connection, lastDisconnect, qr } = update;
     if (qr) {
       state.lastQr = qr;
@@ -1043,7 +1054,11 @@ async function sendMessageInternal(req: QueuedSend, signal: AbortSignal): Promis
     await abortableDelay(randomDelayMs(req.body), signal);
     await abortable(() => socket.sendPresenceUpdate('paused', jid), signal).catch(() => {});
     if (isWhatsAppTerminal() || signal.aborted) return shutdownFailure();
-    const sent = await abortable(() => socket.sendMessage(jid, { text: req.body }), signal);
+    const parsedImage = req.imageDataUri ? parseDataUriImage(req.imageDataUri) : null;
+    const payload = parsedImage
+      ? { image: parsedImage.buffer, mimetype: parsedImage.mimetype, caption: req.body }
+      : { text: req.body };
+    const sent = await abortable(() => socket.sendMessage(jid, payload), signal);
     if (isWhatsAppTerminal() || signal.aborted) return shutdownFailure();
     // sendMessage() only resolves when Baileys hands the payload to its
     // local queue — not when WhatsApp's servers ACK it. Don't claim 'sent'

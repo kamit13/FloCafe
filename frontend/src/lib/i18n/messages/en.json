@@ -190,6 +190,16 @@
     "invalidPhoneCount": "{count, plural, one {# customer has an invalid or legacy phone number format.} other {# customers have an invalid or legacy phone number format.}}",
     "loyaltyLedger": "Loyalty Ledger",
     "noTransactions": "No transactions yet",
+    "offerImageDroppedForWaMe": "WhatsApp isn't connected, so the image can't be included — sending the text only.",
+    "offerImageLabel": "Offer image (optional)",
+    "offerTemplateHint": "Use {placeholder} to include the customer's name.",
+    "offerTemplatePlaceholder": "e.g. 🎉 Today only: 20% off everything! Show this message at checkout.",
+    "offerTemplateRequired": "Set today's offer template before sending.",
+    "offerTemplateSave": "Save template",
+    "offerTemplateSaveFailed": "Failed to save template.",
+    "offerTemplateSaved": "Offer template saved.",
+    "offerTemplateTitle": "Today's offer",
+    "sendOfferTitle": "Send today's offer via WhatsApp",
     "totalBalance": "Total Balance"
   },
   "dashboard": {
@@ -366,6 +376,7 @@
     "itemStatusWaiting": "Waiting",
     "itemVoided": "Item voided",
     "itemsAdded": "Added {count} item(s) to order",
+    "kotPrintFailed": "KOT print failed",
     "linkCustomer": "Link Customer",
     "linkCustomerFailed": "Failed to link customer",
     "linking": "Linking...",
@@ -2257,11 +2268,13 @@
       "customerPhoneRequired": "Add this customer’s phone number before sending.",
       "error": {
         "blocked": "This customer asked to stop receiving messages. Manage blocklist in WhatsApp → Connection.",
+        "invalidImage": "That image can't be sent. Try a smaller photo (JPEG, PNG, or WebP).",
         "notConnected": "Flo isn’t connected to WhatsApp. Reconnect in WhatsApp → Connection.",
         "notOnWhatsapp": "This phone isn’t registered on WhatsApp. Double-check the number with the customer.",
         "rateLimited": "Too many messages sent to this number recently."
       },
       "failed": "Failed to send via WhatsApp.",
+      "offerSuccess": "Offer sent via WhatsApp.",
       "success": "Receipt sent via WhatsApp."
     },
     "sent": {

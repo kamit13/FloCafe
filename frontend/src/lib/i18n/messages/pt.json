@@ -190,6 +190,16 @@
     "invalidPhoneCount": "{count, plural, one {# cliente tem um número de telefone em formato inválido ou antigo.} other {# clientes têm números de telefone em formato inválido ou antigo.}}",
     "loyaltyLedger": "Extrato de Fidelidade",
     "noTransactions": "Nenhuma transação ainda",
+    "offerImageDroppedForWaMe": "O WhatsApp não está conectado, então a imagem não pode ser incluída — enviando apenas o texto.",
+    "offerImageLabel": "Imagem da oferta (opcional)",
+    "offerTemplateHint": "Use {placeholder} para incluir o nome do cliente.",
+    "offerTemplatePlaceholder": "ex: 🎉 Só hoje: 20% de desconto em tudo! Mostre esta mensagem no caixa.",
+    "offerTemplateRequired": "Defina a oferta de hoje antes de enviar.",
+    "offerTemplateSave": "Salvar modelo",
+    "offerTemplateSaveFailed": "Falha ao salvar o modelo.",
+    "offerTemplateSaved": "Modelo de oferta salvo.",
+    "offerTemplateTitle": "Oferta de hoje",
+    "sendOfferTitle": "Enviar a oferta de hoje via WhatsApp",
     "totalBalance": "Saldo Total"
   },
   "dashboard": {
@@ -366,6 +376,7 @@
     "itemStatusWaiting": "Aguardando",
     "itemVoided": "Item anulado",
     "itemsAdded": "{count} item(ns) adicionado(s) ao pedido",
+    "kotPrintFailed": "Falha ao imprimir a comanda",
     "linkCustomer": "Vincular Cliente",
     "linkCustomerFailed": "Falha ao vincular o cliente",
     "linking": "Vinculando...",
@@ -2257,11 +2268,13 @@
       "customerPhoneRequired": "Adicione o número de telefone do cliente antes de enviar.",
       "error": {
         "blocked": "Este cliente pediu para parar de receber mensagens. Gerencie a lista de bloqueio em WhatsApp → Conexão.",
+        "invalidImage": "Não foi possível enviar essa imagem. Tente uma foto menor (JPEG, PNG ou WebP).",
         "notConnected": "O Flo não está conectado ao WhatsApp. Reconecte em WhatsApp → Conexão.",
         "notOnWhatsapp": "Este telefone não está registrado no WhatsApp. Confira o número com o cliente.",
         "rateLimited": "Muitas mensagens enviadas para este número recentemente."
       },
       "failed": "Falha ao enviar via WhatsApp.",
+      "offerSuccess": "Oferta enviada via WhatsApp.",
       "success": "Comprovante enviado via WhatsApp."
     },
     "sent": {

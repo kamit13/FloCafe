@@ -190,6 +190,16 @@
     "invalidPhoneCount": "{count, plural, one {# cliente tiene un número de teléfono con formato inválido o antiguo.} other {# clientes tienen números de teléfono con formato inválido o antiguo.}}",
     "loyaltyLedger": "Historial de fidelidad",
     "noTransactions": "Aún no hay transacciones",
+    "offerImageDroppedForWaMe": "WhatsApp no está conectado, así que no se puede incluir la imagen — se envía solo el texto.",
+    "offerImageLabel": "Imagen de la oferta (opcional)",
+    "offerTemplateHint": "Usá {placeholder} para incluir el nombre del cliente.",
+    "offerTemplatePlaceholder": "ej: 🎉 Solo hoy: ¡20% de descuento en todo! Mostrá este mensaje en caja.",
+    "offerTemplateRequired": "Configurá la oferta de hoy antes de enviarla.",
+    "offerTemplateSave": "Guardar plantilla",
+    "offerTemplateSaveFailed": "No se pudo guardar la plantilla.",
+    "offerTemplateSaved": "Plantilla de oferta guardada.",
+    "offerTemplateTitle": "Oferta de hoy",
+    "sendOfferTitle": "Enviar la oferta de hoy por WhatsApp",
     "totalBalance": "Saldo total"
   },
   "dashboard": {
@@ -366,6 +376,7 @@
     "itemStatusWaiting": "En espera",
     "itemVoided": "Ítem anulado",
     "itemsAdded": "{count} ítem(s) agregados al pedido",
+    "kotPrintFailed": "Fallo al imprimir la comanda",
     "linkCustomer": "Vincular cliente",
     "linkCustomerFailed": "No se pudo vincular el cliente",
     "linking": "Vinculando...",
@@ -2257,11 +2268,13 @@
       "customerPhoneRequired": "Agrega el número de teléfono del cliente antes de enviar.",
       "error": {
         "blocked": "Este cliente pidió no recibir más mensajes. Gestioná la lista de bloqueo en WhatsApp → Conexión.",
+        "invalidImage": "No se pudo enviar esa imagen. Probá con una foto más chica (JPEG, PNG o WebP).",
         "notConnected": "Flo no está conectado a WhatsApp. Reconectá en WhatsApp → Conexión.",
         "notOnWhatsapp": "Este número no está registrado en WhatsApp. Verificá el número con el cliente.",
         "rateLimited": "Se enviaron demasiados mensajes a este número recientemente."
       },
       "failed": "No se pudo enviar por WhatsApp.",
+      "offerSuccess": "Oferta enviada por WhatsApp.",
       "success": "Comprobante enviado por WhatsApp."
     },
     "sent": {

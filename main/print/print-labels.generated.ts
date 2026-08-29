@@ -61,6 +61,10 @@ export type PrintConceptId =
   | 'pos.methodCash'
   | 'pos.methodCard'
   | 'pos.methodWallet'
+  | 'pos.orderTypeDineIn'
+  | 'pos.orderTypeTakeaway'
+  | 'pos.orderTypeDelivery'
+  | 'orders.online'
   ;
 
 export const PRINT_LABEL_LANGUAGES = [
@@ -133,6 +137,10 @@ const PRINT_LABELS: Record<PrintLabelLanguage, PrintLabelTable> = {
     'pos.methodCash': "Cash",
     'pos.methodCard': "Card",
     'pos.methodWallet': "Wallet",
+    'pos.orderTypeDineIn': "Dine in",
+    'pos.orderTypeTakeaway': "Takeaway",
+    'pos.orderTypeDelivery': "Delivery",
+    'orders.online': "Online",
   },
   fa: {
     'print.taxInvoiceTitle': "صورتحساب مالیاتی",
@@ -192,6 +200,10 @@ const PRINT_LABELS: Record<PrintLabelLanguage, PrintLabelTable> = {
     'pos.methodCash': "نقدی",
     'pos.methodCard': "کارت",
     'pos.methodWallet': "کیف",
+    'pos.orderTypeDineIn': "خوردن در محل",
+    'pos.orderTypeTakeaway': "بیرون‌بر",
+    'pos.orderTypeDelivery': "رسانش",
+    'orders.online': "برخط",
   },
   es: {
     'print.taxInvoiceTitle': "FACTURA CON IMPUESTOS",
@@ -251,6 +263,10 @@ const PRINT_LABELS: Record<PrintLabelLanguage, PrintLabelTable> = {
     'pos.methodCash': "Efectivo",
     'pos.methodCard': "Tarjeta",
     'pos.methodWallet': "Billetera",
+    'pos.orderTypeDineIn': "En el local",
+    'pos.orderTypeTakeaway': "Para llevar",
+    'pos.orderTypeDelivery': "Delivery",
+    'orders.online': "En línea",
   },
   pt: {
     'print.taxInvoiceTitle': "FATURA COM IMPOSTOS",
@@ -310,6 +326,10 @@ const PRINT_LABELS: Record<PrintLabelLanguage, PrintLabelTable> = {
     'pos.methodCash': "Dinheiro",
     'pos.methodCard': "Cartão",
     'pos.methodWallet': "Carteira",
+    'pos.orderTypeDineIn': "No local",
+    'pos.orderTypeTakeaway': "Retirada",
+    'pos.orderTypeDelivery': "Entrega",
+    'orders.online': "Online",
   },
 };
 

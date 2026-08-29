@@ -7,6 +7,7 @@ import { getHttpRequestSignal, trackHttpRequestWork } from '../shutdown';
 import * as whatsapp from '../services/whatsapp';
 import * as QRCode from 'qrcode';
 import { parsePhoneE164 } from '../lib/phone';
+import { validateImageUrl } from '../lib/data-uri-image';
 
 const router = Router();
 
@@ -97,7 +98,7 @@ router.post('/disconnect', requireRole(...ROLE_ACCESS.ownerManager), (_req: Requ
 });
 
 router.post('/send', requireRole(...ROLE_ACCESS.ownerManagerCashier), asyncHandler(async (req, res) => {
-  const { bill_id, phone_e164, body, kind } = req.body ?? {};
+  const { bill_id, phone_e164, body, kind, image_data_uri } = req.body ?? {};
   if (!phone_e164) {
     res.status(400).json({ error: 'phone_e164 required', reason: 'phone_required' });
     return;
@@ -112,6 +113,13 @@ router.post('/send', requireRole(...ROLE_ACCESS.ownerManagerCashier), asyncHandl
     res.status(400).json({ error: 'body required', reason: 'body_required' });
     return;
   }
+  if (image_data_uri != null) {
+    const imageCheck = validateImageUrl(image_data_uri);
+    if (!imageCheck.valid) {
+      res.status(400).json({ error: imageCheck.error || 'Invalid image', reason: 'invalid_image' });
+      return;
+    }
+  }
   const userId = (req as any).user?.userId ?? null;
   const result = await trackHttpRequestWork(req, whatsapp.sendMessage({
     phoneE164: parsedPhone.e164,
@@ -120,6 +128,7 @@ router.post('/send', requireRole(...ROLE_ACCESS.ownerManagerCashier), asyncHandl
     customerId: null,
     kind: (kind as any) || 'manual_reply',
     userId,
+    imageDataUri: image_data_uri != null ? String(image_data_uri) : null,
     signal: getHttpRequestSignal(req),
   }));
   if (!result.ok) {
